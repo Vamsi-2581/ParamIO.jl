@@ -38,7 +38,13 @@ keys = ParamIO.expand(spec)            # → Vector{DataKey}, one per (point × 
 k = keys[1]
 k.params              # Dict("system.N" => 8, "model.g" => 0.5, …)  — DOTTED keys
 k.sample              # 1
-ParamIO.format_path(k, spec.path_keys) # "sysN8_modg0.50"  — the on-disk dir name
+path =
+    if spec.float_format == "auto"
+        axis_formats = ParamIO.build_axis_formats(spec)
+        ParamIO.format_path(k, spec.path_keys, axis_formats)
+    else
+        ParamIO.format_path(k, spec.path_keys)
+    end # path string used for the on-disk directory
 ParamIO.canonical(k)  # "model.g=0.5;system.N=8;#sample=1"  — stable identity
 ```
 
@@ -59,6 +65,7 @@ outdir        = "out"           # default output root
 
 [datavault]
 path_keys = ["system.N", "model.g"]   # DOTTED keys that name the on-disk dirs
+float_format = "fixed2"                # default; "auto" avoids float-axis collisions
 # sweep_order = [...]                  # optional: override enumeration order
 
 [[paramsets]]
@@ -80,6 +87,17 @@ which makes a small leading block a way to order a long acquisition: put the sli
 first at the top, let it overlap a later broader block, and pay nothing for the repeat.
 `expand_report(spec)` returns the per-block contribution, which is what tells a block that added
 nothing from a block that was never read.
+
+`float_format` defaults to `"fixed2"`, which keeps legacy two-decimal path names. Set it to
+`"auto"` to format distinct values on each float path axis losslessly and without collisions
+for the current sweep. Auto precision is chosen from current axis values, so adding or removing
+points can change directory names; it never changes `canonical` identities. Compute formats
+once and pass them to the three-argument `format_path`:
+
+```julia
+axis_formats = ParamIO.build_axis_formats(spec)
+ParamIO.format_path(keys[1], spec.path_keys, axis_formats)
+```
 
 ### Projections
 
@@ -182,7 +200,11 @@ name); `canonical` uses *all* params plus the sample index.
 | `artifact_key(spec, name, key) -> DataKey` | the point of artifact `name` that `key` needs |
 | `artifact_identity(spec, name, key) -> String` | that point as a stable on-disk identity, with `version` |
 | `artifact_keys(spec, name) -> Vector{DataKey}` | every distinct point of artifact `name` the sweep needs |
-| `format_path(key, path_keys) -> String` | compact directory segment |
+| `format_path(key, path_keys) -> String` | legacy compact directory segment (two decimals for floats) |
+| `format_path(key, path_keys, axis_formats) -> String` | content-aware paths; pass `build_axis_formats(spec)` for auto mode |
+| `build_axis_formats(spec) -> Dict{String,AxisFloatFmt}` | lossless, collision-free float formats per path axis |
+| `diagnose(spec) -> DiagnosticReport` | non-writing checks for duplicate points, path collisions, invisible params, and ambiguous keys |
+| `AxisFloatFmt` | per-axis precision or shortest-round-trip fallback selected by `build_axis_formats` |
 | `canonical(key) -> String` | stable, Julia-version-independent key identity |
 | `param(key, name[, T]) -> value` | one parameter, resolved dotted-or-leaf and optionally typed |
 | `resolve_path_keys(blocks) -> Vector{String}` | auto-detect `path_keys` if omitted |
@@ -197,9 +219,16 @@ src/
 │   ├── load.jl       TOML load + inherit merge
 │   ├── expand.jl     Cartesian expansion + sweep order
 │   ├── project.jl    project (a coordinate projection of the key space)
-│   ├── format.jl     format_path
-│   └── canonical.jl  canonical (FROZEN schema — downstream identity)
-└── util/             internal (flatten, path_keys)
+│   ├── artifacts.jl  shared artifact identity
+│   ├── format.jl     fixed2 and content-aware format_path
+│   ├── param.jl      typed parameter lookup
+│   ├── canonical.jl  canonical (FROZEN schema — downstream identity)
+│   └── diagnose.jl  grid diagnostics and path-collision checks
+└── util/             internal helpers
+    ├── grid.jl       grid-axis expansion
+    ├── flatten.jl    nested parameter flattening
+    ├── resolve.jl    dotted and leaf key resolution
+    └── path_keys.jl  path-key resolution and validation
 ```
 
 ## See also
