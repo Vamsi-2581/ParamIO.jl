@@ -65,7 +65,7 @@ outdir        = "out"           # default output root
 
 [datavault]
 path_keys = ["system.N", "model.g"]   # DOTTED keys that name the on-disk dirs
-float_format = "fixed2"                # default; "auto" avoids float-axis collisions
+float_format = "fixed2"                # default; "auto" selects content-aware float formatting
 # sweep_order = [...]                  # optional: override enumeration order
 
 [[paramsets]]
@@ -89,10 +89,11 @@ first at the top, let it overlap a later broader block, and pay nothing for the 
 nothing from a block that was never read.
 
 `float_format` defaults to `"fixed2"`, which keeps legacy two-decimal path names. Set it to
-`"auto"` to format distinct values on each float path axis losslessly and without collisions
-for the current sweep. Auto precision is chosen from current axis values, so adding or removing
-points can change directory names; it never changes `canonical` identities. Compute formats
-once and pass them to the three-argument `format_path`:
+`"auto"` to format distinct float values losslessly within each path-key axis in the current
+sweep. Its precision depends on the full sweep, so adding or removing points can rename existing
+directories. Auto formatting does not include integer values when choosing precision, so a mixed
+Int/Float axis can still collide; `diagnose(spec)` reports path collisions. `canonical` identities
+are unaffected. Compute formats once and pass them to the three-argument `format_path`:
 
 ```julia
 axis_formats = ParamIO.build_axis_formats(spec)
@@ -201,8 +202,8 @@ name); `canonical` uses *all* params plus the sample index.
 | `artifact_identity(spec, name, key) -> String` | that point as a stable on-disk identity, with `version` |
 | `artifact_keys(spec, name) -> Vector{DataKey}` | every distinct point of artifact `name` the sweep needs |
 | `format_path(key, path_keys) -> String` | legacy compact directory segment (two decimals for floats) |
-| `format_path(key, path_keys, axis_formats) -> String` | content-aware paths; pass `build_axis_formats(spec)` for auto mode |
-| `build_axis_formats(spec) -> Dict{String,AxisFloatFmt}` | lossless, collision-free float formats per path axis |
+| `format_path(key, path_keys, axis_formats) -> String` | content-aware float paths; names depend on the full sweep |
+| `build_axis_formats(spec) -> Dict{String,AxisFloatFmt}` | per-axis float precision for the current sweep; mixed Int/Float collisions remain possible |
 | `diagnose(spec) -> DiagnosticReport` | non-writing checks for duplicate points, path collisions, invisible params, and ambiguous keys |
 | `AxisFloatFmt` | per-axis precision or shortest-round-trip fallback selected by `build_axis_formats` |
 | `canonical(key) -> String` | stable, Julia-version-independent key identity |
