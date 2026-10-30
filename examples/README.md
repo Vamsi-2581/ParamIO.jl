@@ -50,16 +50,17 @@ DataKey.params                            sample format_path     canonical
 | --- | --- | --- |
 | `[study]` | ParamIO + DataVault | `project_name`, `total_samples`, default `outdir` |
 | `[datavault] path_keys` | ParamIO | dotted keys that name the directory / identity |
-| `[datavault] float_format` | ParamIO | `"fixed2"` (default) or `"auto"` for lossless, collision-free float segments per axis |
+| `[datavault] float_format` | ParamIO | `"fixed2"` (default) or `"auto"` for content-aware float formatting |
 | `[[paramsets]]` blocks | ParamIO | list value ⇒ swept axis; scalar ⇒ fixed |
 
 Optional: `[datavault] sweep_order` overrides enumeration order; `[base] inherit = "parent.toml"`
 merges a parent config first.
 
 With `float_format = "auto"`, call `build_axis_formats(spec)` once and pass the result as the
-third argument to `format_path`. It prevents collisions between distinct values on a float path
-axis in the current sweep. Since precision follows current values, changing the sweep can change
-directory names; `canonical` remains unchanged.
+third argument to `format_path`. Distinct float values on a path-key axis are formatted
+losslessly for the current sweep, but editing the sweep can rename existing directories. Integer
+values are excluded from float precision selection, so mixed Int/Float axes may still collide;
+`diagnose(spec)` reports path collisions. `canonical` remains unchanged.
 
 ## Public API
 
@@ -68,8 +69,8 @@ directory names; `canonical` remains unchanged.
 | `load(path) -> ConfigSpec` | parse the TOML (and merge `[base] inherit`) |
 | `expand(spec) -> Vector{DataKey}` | Cartesian product × samples |
 | `format_path(key, path_keys) -> String` | legacy compact directory segment |
-| `format_path(key, path_keys, axis_formats) -> String` | content-aware paths for auto mode |
-| `build_axis_formats(spec) -> Dict{String,AxisFloatFmt}` | per-axis float formats |
+| `format_path(key, path_keys, axis_formats) -> String` | content-aware float paths based on the current sweep |
+| `build_axis_formats(spec) -> Dict{String,AxisFloatFmt}` | per-axis float formatting for the current sweep |
 | `diagnose(spec) -> DiagnosticReport` | non-writing checks for duplicate points and path issues |
 | `canonical(key) -> String` | stable identity (used by SweepRunner) |
 
