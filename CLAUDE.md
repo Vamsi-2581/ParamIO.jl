@@ -10,7 +10,7 @@ storage. See [`../CLAUDE.md`](../CLAUDE.md) for how the three layers fit togethe
 - `expand(spec) -> Vector{DataKey}` — Cartesian product of list-valued params × `total_samples`.
 - `format_path(key, path_keys) -> String` — legacy compact path; floats use two decimals.
 - `format_path(key, path_keys, axis_formats) -> String` — content-aware float path using `build_axis_formats`.
-- `build_axis_formats(spec) -> Dict{String,AxisFloatFmt}` — formats distinct float values per path axis without collisions.
+- `build_axis_formats(spec) -> Dict{String,AxisFloatFmt}` — formats float values from the current sweep; mixed Int/Float collisions remain possible.
 - `diagnose(spec) -> DiagnosticReport` — non-writing preflight checks for duplicate points, path collisions, invisible params and ambiguous keys.
 - `canonical(key) -> String` — stable, order-/version-independent key identity.
 - `param(key, name[, T])` — one parameter, resolved dotted-or-leaf; with `T` it refuses a
@@ -37,10 +37,12 @@ storage. See [`../CLAUDE.md`](../CLAUDE.md) for how the three layers fit togethe
 
 ## Float path formatting
 
-`[datavault] float_format` defaults to `"fixed2"`. `"auto"` formats distinct float values
-losslessly and without collisions within each path axis for the current sweep. Its precision is
-chosen from current values, so changing the sweep can change directory names; `canonical()` is
-unaffected. Pass `build_axis_formats(spec)` to the three-argument `format_path` in auto mode.
+`[datavault] float_format` defaults to `"fixed2"`. `"auto"` preserves distinct float values
+losslessly within each path-key axis for the current sweep. Its precision depends on the full
+sweep, so editing the sweep can rename existing directories. Since integer values are excluded
+from float precision selection, mixed Int/Float axes may still collide; `diagnose(spec)` reports
+path collisions. `canonical()` is unaffected. Pass `build_axis_formats(spec)` to the three-argument
+`format_path` in auto mode.
 
 ## Source layout
 
