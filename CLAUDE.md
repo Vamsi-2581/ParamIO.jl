@@ -8,7 +8,10 @@ storage. See [`../CLAUDE.md`](../CLAUDE.md) for how the three layers fit togethe
 
 - `load(path) -> ConfigSpec` — parse TOML (merges `[base] inherit` if present).
 - `expand(spec) -> Vector{DataKey}` — Cartesian product of list-valued params × `total_samples`.
-- `format_path(key, path_keys) -> String` — compact on-disk directory segment.
+- `format_path(key, path_keys) -> String` — legacy compact path; floats use two decimals.
+- `format_path(key, path_keys, axis_formats) -> String` — content-aware float path using `build_axis_formats`.
+- `build_axis_formats(spec) -> Dict{String,AxisFloatFmt}` — formats distinct float values per path axis without collisions.
+- `diagnose(spec) -> DiagnosticReport` — non-writing preflight checks for duplicate points, path collisions, invisible params and ambiguous keys.
 - `canonical(key) -> String` — stable, order-/version-independent key identity.
 - `param(key, name[, T])` — one parameter, resolved dotted-or-leaf; with `T` it refuses a
   conversion that would change the number.
@@ -32,10 +35,18 @@ storage. See [`../CLAUDE.md`](../CLAUDE.md) for how the three layers fit togethe
 - `README.md` — config schema + API.
 - Full stack: [`../SweepRunner.jl/examples/`](../SweepRunner.jl/examples/).
 
+## Float path formatting
+
+`[datavault] float_format` defaults to `"fixed2"`. `"auto"` formats distinct float values
+losslessly and without collisions within each path axis for the current sweep. Its precision is
+chosen from current values, so changing the sweep can change directory names; `canonical()` is
+unaffected. Pass `build_axis_formats(spec)` to the three-argument `format_path` in auto mode.
+
 ## Source layout
 
-`src/core/` = public API (`types`, `load`, `expand`, `format`, `canonical`, `param`).
-`src/util/` = internal (`grid`, `flatten`, `path_keys`) — renamable without notice.
+- `src/ParamIO.jl`: exports and include order.
+- `src/core/`: `types`, `load`, `expand`, `project`, `artifacts`, `format`, `param`, `canonical`, `diagnose`.
+- `src/util/`: `grid`, `flatten`, `resolve`, `path_keys`.
 
 ## Invariant when changing this package
 
